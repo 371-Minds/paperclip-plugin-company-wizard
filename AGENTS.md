@@ -54,11 +54,16 @@ templates/
 ├── roles/                     # All roles with role.meta.json
 ├── modules/                   # Composable capabilities (26 modules)
 │   └── <module>/
-│       ├── module.meta.json   # capabilities[], activatesWithRoles[], tasks[], goal?, adapterOverrides?
+│       ├── module.meta.json   # capabilities[], activatesWithRoles[], issues[], routines[]?, permissions[], adapterOverrides?, goal?
 │       ├── skills/            # Shared primary skills
 │       ├── agents/<role>/     # Role-specific overrides, fallbacks, heartbeat sections
 │       └── docs/              # Shared docs injected into all agents
-└── presets/                   # Curated combinations (15 presets, may include goals[])
+├── presets/                   # Curated combinations (15 presets, may include goals[])
+└── ai-wizard/                 # Configurable prompts for AI wizard mode
+    ├── config-format.md
+    ├── single-shot-system.md
+    ├── interview-system.md
+    └── messages.json
 ```
 
 Each module contains:
