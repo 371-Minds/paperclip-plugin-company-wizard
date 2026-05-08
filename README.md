@@ -518,7 +518,12 @@ Configure the plugin via **Settings → Plugins → Company Wizard** in the Pape
 | `paperclipUrl` | No | Paperclip instance URL. Defaults to `http://localhost:3100` or `PAPERCLIP_PUBLIC_URL` env var. |
 | `paperclipEmail` | No | Board login email. Required for authenticated (non-`local_trusted`) instances. |
 | `paperclipPassword` | No | Board login password. Stored as a secret ref. |
-| `anthropicApiKey` | No | Anthropic API key for AI wizard mode. Stored as a secret ref. Required to use the AI-powered setup path. |
+| `portkeyApiKey` | No | Portkey service API key for AI wizard mode. Stored as a secret ref. Required to use the AI-powered setup path via Portkey. |
+| `portkeyVirtualKey` | No | Portkey virtual key for routing to a specific provider/model. Optional — used alongside `portkeyApiKey`. |
+| `portkeyConfigId` | No | Portkey config ID for config-based routing (gateway configs, fallbacks, retries). Optional. |
+| `portkeyModel` | No | Model to request from Portkey. Defaults to `@csuite-zai/glm-5.1`. |
+| `llamaCppBaseUrl` | No | Base URL of a local llama.cpp server used as fallback. Defaults to `http://localhost:8080`. |
+| `llamaCppModel` | No | Model name to send to llama.cpp. Optional — most local servers use whichever model is loaded. |
 | `disableBoardApprovalOnNewCompanies` | No | If `true`, the wizard PATCHes new companies to set `requireBoardApprovalForNewAgents=false` during provisioning. Leave `false` to preserve approval-gated hiring. Defaults to `false`. |
 
 <br>

@@ -43,11 +43,38 @@ const manifest: PaperclipPluginManifestV1 = {
         description:
           'GitHub tree URL to pull templates from when the templates directory does not exist.',
       },
-      anthropicApiKey: {
+      portkeyApiKey: {
         type: 'string',
         format: 'secret-ref',
         description:
-          'Anthropic API key for the AI wizard. Required to use the AI-powered company setup path.',
+          'Portkey service API key for the AI wizard. Required to use the AI-powered company setup path via Portkey.',
+      },
+      portkeyVirtualKey: {
+        type: 'string',
+        description:
+          'Portkey virtual key for routing to a specific provider/model configuration. Optional — used alongside portkeyApiKey for virtual key-based routing.',
+      },
+      portkeyConfigId: {
+        type: 'string',
+        description:
+          'Portkey config ID for config-based routing (gateway configs, fallbacks, retries). Optional — takes effect when set alongside portkeyApiKey.',
+      },
+      portkeyModel: {
+        type: 'string',
+        default: '@csuite-zai/glm-5.1',
+        description:
+          'Model to request from Portkey. Defaults to @csuite-zai/glm-5.1. Override to use any model your Portkey account can route to.',
+      },
+      llamaCppBaseUrl: {
+        type: 'string',
+        default: 'http://localhost:8080',
+        description:
+          'Base URL of a local llama.cpp server used as a fallback when Portkey is unavailable or returns an error. Defaults to http://localhost:8080.',
+      },
+      llamaCppModel: {
+        type: 'string',
+        description:
+          'Model name to send to llama.cpp (optional — most local servers ignore it and use whichever model is loaded).',
       },
       paperclipUrl: {
         type: 'string',

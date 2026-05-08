@@ -24,8 +24,8 @@ After `pnpm build`, reload the plugin in the Paperclip UI. No reinstall required
 - `preview-files` — Assembles to a temp dir, returns `.md` file tree as `{path, content}[]`, cleans up. Used by the ConfigReview step for inline preview+edit before provisioning.
 - `start-provision` — Assembles to the workspace `companies/` dir, applies `fileOverrides` (edits from preview), then provisions via Paperclip API.
 - `check-auth` — Validates Paperclip API credentials early (used by the summary step).
-- `ai-chat` — Proxies messages to the Anthropic API using the configured key. Returns `{ text, error? }` — never throws.
-- `check-ai-config` — Lightweight check that `anthropicApiKey` is configured. Called by the AI wizard on mount to show a warning banner.
+- `ai-chat` — Routes messages through Portkey (primary) with local llama.cpp as fallback. Uses OpenAI-compatible chat completions format. Supports service API key, virtual key, and config-ID routing headers. Returns `{ text, error? }` — never throws.
+- `check-ai-config` — Lightweight check that `portkeyApiKey` is configured. Called by the AI wizard on mount to show a warning banner.
 - `refresh-templates` — Deletes cached templates dir and re-downloads from GitHub. Triggered by the "Update templates" button on the onboarding screen.
 
 All worker actions return errors as `{ error }` instead of throwing, so the plugin host never swallows messages in generic 502 responses.

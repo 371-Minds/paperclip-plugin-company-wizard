@@ -288,42 +288,120 @@ const plugin = definePlugin({
       }
     });
 
-    // AI chat action — proxies messages to the Anthropic API using the configured key.
-    // Keeps the API key server-side; the UI never touches it directly.
+    // AI chat action — routes messages through Portkey (primary) with local llama.cpp as fallback.
+    // Keeps all API keys server-side; the UI never touches them directly.
     // Returns { text, error? } — never throws, so the plugin host doesn't swallow the message in a 502.
     ctx.actions.register('ai-chat', async (params) => {
       try {
         const cfg = ((await ctx.config.get()) ?? {}) as Record<string, string>;
-        const apiKey = cfg.anthropicApiKey || '';
-        if (!apiKey) {
+        const portkeyApiKey = cfg.portkeyApiKey || '';
+        const portkeyVirtualKey = cfg.portkeyVirtualKey || '';
+        const portkeyConfigId = cfg.portkeyConfigId || '';
+        const model = cfg.portkeyModel || '@csuite-zai/glm-5.1';
+        const llamaCppBaseUrl = (() => {
+          const raw = (cfg.llamaCppBaseUrl || 'http://localhost:8080').replace(/\/+$/, '');
+          return raw || 'http://localhost:8080';
+        })();
+        const llamaCppModel = cfg.llamaCppModel || '';
+
+        // Build OpenAI-compatible messages array (system prompt as first message).
+        const messages = [
+          ...(params.system ? [{ role: 'system', content: params.system }] : []),
+          ...(params.messages as Array<{ role: string; content: string }>),
+        ];
+
+        // --- Portkey (primary) ---
+        if (portkeyApiKey) {
+          const portkeyHeaders: Record<string, string> = {
+            'Content-Type': 'application/json',
+            'x-portkey-api-key': portkeyApiKey,
+          };
+          if (portkeyVirtualKey) portkeyHeaders['x-portkey-virtual-key'] = portkeyVirtualKey;
+          if (portkeyConfigId) portkeyHeaders['x-portkey-config'] = portkeyConfigId;
+
+          let portkeyError = '';
+          try {
+            const response = await fetch('https://api.portkey.ai/v1/chat/completions', {
+              method: 'POST',
+              headers: portkeyHeaders,
+              body: JSON.stringify({ model, max_tokens: 8192, messages }),
+            });
+
+            if (response.ok) {
+              const data = (await response.json()) as {
+                choices?: { message?: { content?: string } }[];
+              };
+              return { text: data.choices?.[0]?.message?.content || '' };
+            }
+
+            const body = await response.text();
+            portkeyError = `Portkey API error (${response.status}): ${body}`;
+          } catch (err) {
+            portkeyError = `Portkey request failed: ${err instanceof Error ? err.message : String(err)}`;
+          }
+
+          // --- llama.cpp fallback ---
+          try {
+            const llamaResponse = await fetch(`${llamaCppBaseUrl}/v1/chat/completions`, {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({
+                ...(llamaCppModel ? { model: llamaCppModel } : {}),
+                max_tokens: 8192,
+                messages,
+              }),
+            });
+
+            if (llamaResponse.ok) {
+              const llamaData = (await llamaResponse.json()) as {
+                choices?: { message?: { content?: string } }[];
+              };
+              return { text: llamaData.choices?.[0]?.message?.content || '' };
+            }
+
+            const llamaBody = await llamaResponse.text();
+            return {
+              text: '',
+              error: `${portkeyError}. llama.cpp fallback HTTP error (${llamaResponse.status}): ${llamaBody}`,
+            };
+          } catch (llamaErr) {
+            return {
+              text: '',
+              error: `${portkeyError}. llama.cpp fallback unreachable at ${llamaCppBaseUrl}: ${llamaErr instanceof Error ? llamaErr.message : String(llamaErr)}`,
+            };
+          }
+        }
+
+        // --- No Portkey key: try llama.cpp directly ---
+        try {
+          const llamaResponse = await fetch(`${llamaCppBaseUrl}/v1/chat/completions`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              ...(llamaCppModel ? { model: llamaCppModel } : {}),
+              max_tokens: 8192,
+              messages,
+            }),
+          });
+
+          if (llamaResponse.ok) {
+            const llamaData = (await llamaResponse.json()) as {
+              choices?: { message?: { content?: string } }[];
+            };
+            return { text: llamaData.choices?.[0]?.message?.content || '' };
+          }
+
+          const llamaBody = await llamaResponse.text();
           return {
             text: '',
-            error: 'Anthropic API key not configured. Add it in plugin settings (anthropicApiKey).',
+            error: `Portkey API key not configured and llama.cpp fallback failed (${llamaResponse.status}): ${llamaBody}. Add portkeyApiKey in plugin settings or ensure llama.cpp is running at ${llamaCppBaseUrl}.`,
+          };
+        } catch (llamaErr) {
+          return {
+            text: '',
+            error: `Portkey API key not configured (add portkeyApiKey in plugin settings) and llama.cpp is unreachable at ${llamaCppBaseUrl}: ${llamaErr instanceof Error ? llamaErr.message : String(llamaErr)}.`,
           };
         }
-
-        const response = await fetch('https://api.anthropic.com/v1/messages', {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            'x-api-key': apiKey,
-            'anthropic-version': '2023-06-01',
-          },
-          body: JSON.stringify({
-            model: 'claude-sonnet-4-20250514',
-            max_tokens: 8192,
-            ...(params.system ? { system: params.system } : {}),
-            messages: params.messages,
-          }),
-        });
-
-        if (!response.ok) {
-          const body = await response.text();
-          return { text: '', error: `Anthropic API error (${response.status}): ${body}` };
-        }
-
-        const data = (await response.json()) as { content?: { text: string }[] };
-        return { text: data.content?.[0]?.text || '' };
       } catch (err) {
         return { text: '', error: err instanceof Error ? err.message : String(err) };
       }
@@ -333,10 +411,11 @@ const plugin = definePlugin({
     ctx.actions.register('check-ai-config', async () => {
       try {
         const cfg = ((await ctx.config.get()) ?? {}) as Record<string, string>;
-        if (!cfg.anthropicApiKey) {
+        if (!cfg.portkeyApiKey) {
           return {
             ok: false,
-            error: 'Anthropic API key not configured. Add it in plugin settings (anthropicApiKey).',
+            error:
+              'Portkey API key not configured. Add it in plugin settings (portkeyApiKey). A local llama.cpp server will be used as fallback if reachable.',
           };
         }
         return { ok: true };
