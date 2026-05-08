@@ -1,1 +1,5 @@
+#!/bin/sh
+# Skip hook in CI/automation environments where pnpm may not be available.
+[ -n "$CI" ] && exit 0
+
 pnpm build
